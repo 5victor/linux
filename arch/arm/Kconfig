@@ -748,45 +748,11 @@ config ARCH_SA1100
 	help
 	  Support for StrongARM 11x0 based boards.
 
-config ARCH_S3C2410
-	bool "Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443, S3C2450"
-	select GENERIC_GPIO
-	select ARCH_HAS_CPUFREQ
-	select HAVE_CLK
-	select CLKDEV_LOOKUP
-	select ARCH_USES_GETTIMEOFFSET
-	select HAVE_S3C2410_I2C if I2C
+config ARCH_S3C2440
+	bool "Samsung S3C2440"
+	select CPU_ARM920T
 	help
-	  Samsung S3C2410X CPU based systems, such as the Simtec Electronics
-	  BAST (<http://www.simtec.co.uk/products/EB110ITX/>), the IPAQ 1940 or
-	  the Samsung SMDK2410 development board (and derivatives).
-
-	  Note, the S3C2416 and the S3C2450 are so close that they even share
-	  the same SoC ID code. This means that there is no separate machine
-	  directory (no arch/arm/mach-s3c2450) as the S3C2416 was first.
-
-config ARCH_S3C64XX
-	bool "Samsung S3C64XX"
-	select PLAT_SAMSUNG
-	select CPU_V6
-	select ARM_VIC
-	select HAVE_CLK
-	select HAVE_TCM
-	select CLKDEV_LOOKUP
-	select NO_IOPORT
-	select ARCH_USES_GETTIMEOFFSET
-	select ARCH_HAS_CPUFREQ
-	select ARCH_REQUIRE_GPIOLIB
-	select SAMSUNG_CLKSRC
-	select SAMSUNG_IRQ_VIC_TIMER
-	select S3C_GPIO_TRACK
-	select S3C_DEV_NAND
-	select USB_ARCH_HAS_OHCI
-	select SAMSUNG_GPIOLIB_4BIT
-	select HAVE_S3C2410_I2C if I2C
-	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-	help
-	  Samsung S3C64XX series based systems
+		Samsung S3C2440 port by Victor
 
 config ARCH_S5P64X0
 	bool "Samsung S5P6440 S5P6450"
@@ -1055,24 +1021,13 @@ source "arch/arm/mach-realview/Kconfig"
 source "arch/arm/mach-sa1100/Kconfig"
 
 source "arch/arm/plat-samsung/Kconfig"
-source "arch/arm/plat-s3c24xx/Kconfig"
 source "arch/arm/plat-s5p/Kconfig"
 
 source "arch/arm/plat-spear/Kconfig"
 
 source "arch/arm/plat-tcc/Kconfig"
 
-if ARCH_S3C2410
-source "arch/arm/mach-s3c2410/Kconfig"
-source "arch/arm/mach-s3c2412/Kconfig"
-source "arch/arm/mach-s3c2416/Kconfig"
 source "arch/arm/mach-s3c2440/Kconfig"
-source "arch/arm/mach-s3c2443/Kconfig"
-endif
-
-if ARCH_S3C64XX
-source "arch/arm/mach-s3c64xx/Kconfig"
-endif
 
 source "arch/arm/mach-s5p64x0/Kconfig"
 
@@ -1564,7 +1519,7 @@ source kernel/Kconfig.preempt
 
 config HZ
 	int
-	default 200 if ARCH_EBSA110 || ARCH_S3C2410 || ARCH_S5P64X0 || \
+	default 200 if ARCH_EBSA110 || ARCH_S5P64X0 || \
 		ARCH_S5PV210 || ARCH_EXYNOS4
 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
 	default AT91_TIMER_HZ if ARCH_AT91
@@ -2087,47 +2042,6 @@ config CPU_FREQ_S3C
 	bool
 	help
 	  Internal configuration node for common cpufreq on Samsung SoC
-
-config CPU_FREQ_S3C24XX
-	bool "CPUfreq driver for Samsung S3C24XX series CPUs (EXPERIMENTAL)"
-	depends on ARCH_S3C2410 && CPU_FREQ && EXPERIMENTAL
-	select CPU_FREQ_S3C
-	help
-	  This enables the CPUfreq driver for the Samsung S3C24XX family
-	  of CPUs.
-
-	  For details, take a look at <file:Documentation/cpu-freq>.
-
-	  If in doubt, say N.
-
-config CPU_FREQ_S3C24XX_PLL
-	bool "Support CPUfreq changing of PLL frequency (EXPERIMENTAL)"
-	depends on CPU_FREQ_S3C24XX && EXPERIMENTAL
-	help
-	  Compile in support for changing the PLL frequency from the
-	  S3C24XX series CPUfreq driver. The PLL takes time to settle
-	  after a frequency change, so by default it is not enabled.
-
-	  This also means that the PLL tables for the selected CPU(s) will
-	  be built which may increase the size of the kernel image.
-
-config CPU_FREQ_S3C24XX_DEBUG
-	bool "Debug CPUfreq Samsung driver core"
-	depends on CPU_FREQ_S3C24XX
-	help
-	  Enable s3c_freq_dbg for the Samsung S3C CPUfreq core
-
-config CPU_FREQ_S3C24XX_IODEBUG
-	bool "Debug CPUfreq Samsung driver IO timing"
-	depends on CPU_FREQ_S3C24XX
-	help
-	  Enable s3c_freq_iodbg for the Samsung S3C CPUfreq core
-
-config CPU_FREQ_S3C24XX_DEBUGFS
-	bool "Export debugfs for CPUFreq"
-	depends on CPU_FREQ_S3C24XX && DEBUG_FS
-	help
-	  Export status information via debugfs.
 
 endif
 
