@@ -1,0 +1,12 @@
+if ARCH_S3C2440
+
+menu "S3C2440 MACHINES"
+
+config MACH_MINI2440
+	bool "mini2440 board"
+	help
+		mini2440 board support
+
+endmenu
+
+endif
