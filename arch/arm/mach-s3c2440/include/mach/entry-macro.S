@@ -1,5 +1,6 @@
 
 #include <mach/map.h>
+#include <mach/regs-int.h>
 
 	.macro disable_fiq
 
@@ -10,7 +11,7 @@
 	.endm
 
 	.macro get_irqnr_and_base, irqnr, irqstat, base, tmp
-
+		ldr \irqnr, [\base, #INTOFFSET]
 	.endm
 
 	.macro arch_ret_to_user, tmp1, tmp2
