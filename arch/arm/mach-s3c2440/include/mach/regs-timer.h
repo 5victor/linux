@@ -18,4 +18,8 @@
 #define	TCNTB4	0x3C
 #define	TCNTO4	0x40
 
+#include <mach/map.h>
+
+#define REG_TIMER(x)    (S3C2440_VA_TIMER + (x))
+
 #endif

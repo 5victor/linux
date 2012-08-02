@@ -7,8 +7,7 @@
 #include <asm/mach/time.h>
 #include <mach/map.h>
 #include <mach/regs-timer.h>
-
-#define REG_TIMER(x)	(S3C2440_VA_TIMER + (x))
+#include <mach/regs-int.h>
 
 irqreturn_t s3c2440_timer_interrupt(int irq, void *dev_id)
 {
@@ -27,7 +26,14 @@ static void s3c2440_timer_setup(void)
 	int pclk_rate;
 	unsigned long tcfg0, tcfg1;
 	unsigned int tcnt;
-	struct clk *pclk = clk_get(NULL, "pclk");
+	unsigned long intmsk;
+	struct clk *pclk;
+
+	intmsk = ioread32(REG_INT(INTMSK));
+	intmsk &= 1 << 15;
+	iowrite32(intmsk, REG_INT(INTMSK));
+
+	pclk = clk_get(NULL, "pclk");
 	if (IS_ERR(pclk))
 		panic("setup timer fail");
 	pclk_rate = clk_get_rate(pclk);
