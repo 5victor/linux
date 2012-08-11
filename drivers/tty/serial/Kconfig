@@ -510,13 +510,13 @@ config SERIAL_S3C2412
 	  Serial port support for the Samsung S3C2412 and S3C2413 SoC
 
 config SERIAL_S3C2440
-	tristate "Samsung S3C2440/S3C2442/S3C2416 Serial port support"
-	depends on SERIAL_SAMSUNG && (CPU_S3C2440 || CPU_S3C2442 || CPU_S3C2416)
-	default y if CPU_S3C2440
-	default y if CPU_S3C2442
-	select SERIAL_SAMSUNG_UARTS_4 if CPU_S3C2416
+	tristate "Samsung S3C2440 Serial port support"
+	depends on ARCH_S3C2440
+	default y if ARCH_S3C2440
+	select SERIAL_CORE
+	select SERIAL_CORE_CONSOLE
 	help
-	  Serial port support for the Samsung S3C2440, S3C2416 and S3C2442 SoC
+	  Serial port support for the Samsung S3C2440 SoC
 
 config SERIAL_S3C6400
 	tristate "Samsung S3C6400/S3C6410/S5P6440/S5P6450/S5PC100 Serial port support"
