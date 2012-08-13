@@ -8,10 +8,10 @@
 #define UTRSTAT	0x10
 
 #define	UERSTAT	0x14
-#define UFSTAT	0x8
+#define UFSTAT	0x18
 #define UMSTAT	0x1C
-#define	UTXH	0x23
-#define URXH	0x27
+#define	UTXH	0x20
+#define URXH	0x24
 #define UBRDIV	0x28
 
 #endif

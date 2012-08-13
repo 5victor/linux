@@ -15,11 +15,6 @@ static struct map_desc s3c2440_iodesc[] __initdata = {
 		.length		= SZ_4K,
 		.type		= MT_DEVICE,
 	}, {
-		.virtual	= S3C2440_PA_CLK_PW,
-		.pfn		= __phys_to_pfn(S3C2440_PA_CLK_PW),
-		.length		= SZ_4K,
-		.type		= MT_DEVICE,
-	}, {
 		.virtual	= S3C2440_VA_UART0,
 		.pfn		= __phys_to_pfn(S3C2440_PA_UART0),
 		.length		= SZ_4K,
