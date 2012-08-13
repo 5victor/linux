@@ -9,6 +9,7 @@
 #include <mach/map.h>
 #include <mach/regs-uart.h>
 #include <mach/regs-gpio.h>
+#include <mach/regs-clk.h>
 
 MODULE_LICENSE("GPL");
 
@@ -121,7 +122,10 @@ static void s3c2440_uart_set_termios(struct uart_port *port,
 
 static void s3c2440_uart_config_port(struct uart_port *port, int flag)
 {
-	iowrite32((1 << 2) | 2, reg_uart(port, UCON));
+	unsigned long clkcon = ioread32(REG_CLK(CLKCON));
+	clkcon |= 0x00000400 << port->line;
+	iowrite32(clkcon, REG_CLK(CLKCON));
+	iowrite32((2 << 10) | (1 << 2) | 1, reg_uart(port, UCON));
 	iowrite8((3 << 6) | (3 << 4) | 7, reg_uart(port, UFCON));
 	iowrite8(0x0, reg_uart(port, UMCON));
 }
@@ -172,7 +176,7 @@ static struct uart_port s3c2440_uart_port[] = {
 		.ops		= &s3c2440_uart_ops,
 	},
 	[2] = {
-		.line		= 1,
+		.line		= 2,
 		.mapbase	= S3C2440_VA_UART2,
 		.fifosize	=32,
 		.ops		= &s3c2440_uart_ops,

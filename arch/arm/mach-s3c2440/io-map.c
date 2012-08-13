@@ -5,13 +5,23 @@
 
 static struct map_desc s3c2440_iodesc[] __initdata = {
 	{
-		.virtual	= S3C2440_PA_MEM_CTRL,
+		.virtual	= S3C2440_VA_MEM_CTRL,
 		.pfn		= __phys_to_pfn(S3C2440_PA_MEM_CTRL),
                 .length		= SZ_4K,
                 .type		= MT_DEVICE,
 	}, {
-		.virtual	= S3C2440_PA_INT_CTRL,
-		.pfn		= __phys_to_pfn(S3C2440_VA_INT_CTRL),
+		.virtual	= S3C2440_VA_INT_CTRL,
+		.pfn		= __phys_to_pfn(S3C2440_PA_INT_CTRL),
+		.length		= SZ_4K,
+		.type		= MT_DEVICE,
+	}, {
+		.virtual	= S3C2440_VA_CLK_PW,
+		.pfn		= __phys_to_pfn(S3C2440_PA_CLK_PW),
+		.length		= SZ_4K,
+		.type		= MT_DEVICE,
+	}, {
+		.virtual	= S3C2440_VA_GPIO,
+		.pfn		= __phys_to_pfn(S3C2440_PA_GPIO),
 		.length		= SZ_4K,
 		.type		= MT_DEVICE,
 	}, {

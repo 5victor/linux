@@ -158,17 +158,9 @@ static void clk_setup(struct clk *clk)
 	clk->setup();
 }
 
-static struct map_desc	s3c2440_clk_map_desc __initdata = {
-	.virtual	= S3C2440_VA_CLK_PW,
-	.pfn		= __phys_to_pfn(S3C2440_PA_CLK_PW),
-	.length		= SZ_4K,
-	.type		= MT_DEVICE,
-};
-
 void s3c2440_clk_init(void)
 {
 	int i;
-	iotable_init(&s3c2440_clk_map_desc, 1);
 	for (i = 0; i < ARRAY_SIZE(s3c2440_clk); i++) {
 		clk_setup(&s3c2440_clk[i]);
 	}

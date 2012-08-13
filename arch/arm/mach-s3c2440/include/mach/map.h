@@ -53,7 +53,7 @@
 #define S3C2440_PA_UART2	S3C2440_PA_UARTx(2)
 
 /* VA defines */
-#define S3C2440_VA_BASE		0xF0000000
+#define S3C2440_VA_BASE		0xF8000000
 #define MAP_VA(addr,n)		(S3C2440_VA_BASE+0x1000*(n) + \
 					((addr)&0xFFF))
 
@@ -95,7 +95,7 @@
 
 #define S3C2440_VA_AC97		MAP_VA(S3C2440_PA_AC97, 17)
 
-#define MAP_VA_UART(n)		(0xF1000000+0x1000000*(n)+ \
+#define MAP_VA_UART(n)		(0xF9000000+0x1000000*(n)+ \
 					(S3C2440_PA_UARTx(n) & 0xFFF))
 
 #define S3C2440_VA_UART0	MAP_VA_UART(0)
