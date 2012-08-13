@@ -12,6 +12,12 @@
 
 #define REG_CLK(x)	(S3C2440_VA_CLK_PW + (x))
 
+#ifdef DEBUG
+#define debug(format,args...)	printk(format,##args)
+#else
+#define debug(format,args...)
+#endif
+
 struct clk {
 	char	*name;
 	int	id;
@@ -37,10 +43,10 @@ static int s3c2440_fclk_get_rate(struct clk *clk)
 {
 	unsigned long mpllcon = ioread32(REG_CLK(MPLLCON));
 	int m, p, s;
-	m = (mpllcon >> 12) & 0xFF;
-	p = (mpllcon >> 4) & 0x3F;
+	m = ((mpllcon >> 12) & 0xFF) + 8;
+	p = ((mpllcon >> 4) & 0x3F) + 2;
 	s = mpllcon & 0x3;
-	return (2 * m * CLOCK_TICK_RATE) / (p * 2 ^ s);
+	return 2 * m * (CLOCK_TICK_RATE / (p << s));
 }
 
 static void s3c2440_hclk_setup(void)
@@ -61,6 +67,7 @@ static int s3c2440_hclk_get_rate(struct clk *clk)
 	unsigned long clkdivn = ioread32(REG_CLK(CLKDIVN));
 	unsigned long camdivn = ioread32(REG_CLK(CAMDIVN));
 	int rate;
+	debug("fclk_rate:%d\n", fclk_rate);
 	switch ((clkdivn >> 1) & 0x3) {
 	case 0:
 		rate = fclk_rate;
@@ -89,6 +96,7 @@ static int s3c2440_pclk_get_rate(struct clk *clk)
 	struct clk *hclk = clk_get_parent(clk);
 	int hclk_rate = clk_get_rate(hclk);
 	unsigned long clkdivn = ioread32(REG_CLK(CLKDIVN));
+	debug("hclk_rate:%d\n", hclk_rate);
 	return (clkdivn & 0x1) ? hclk_rate / 2 : hclk_rate;
 }
 

@@ -15,6 +15,12 @@ MODULE_LICENSE("GPL");
 
 #define REG_GPIO(x)	(S3C2440_VA_GPIO + (x))
 
+#ifdef	DEBUG
+#define	debug(format,arg...)	printk(format,##arg)
+#else
+#define	debug(format,arg...)
+#endif
+
 static inline void *reg_uart(struct uart_port *port, int offset)
 {
 	return (void *)(port->mapbase + offset);
@@ -57,7 +63,6 @@ static int s3c2440_uart_poll_getchar(struct uart_port *port)
 }
 #endif
 
-#ifdef CONFIG_CONSOLE_POLL
 static void s3c2440_uart_poll_putchar(struct uart_port *port, unsigned char *c)
 {
 	unsigned long ufstat;
@@ -69,7 +74,6 @@ static void s3c2440_uart_poll_putchar(struct uart_port *port, unsigned char *c)
 		}
 	} while(1);
 }
-#endif
 
 static void s3c2440_uart_set_termios(struct uart_port *port,
 				struct ktermios *new, struct ktermios *old)
@@ -83,8 +87,10 @@ static void s3c2440_uart_set_termios(struct uart_port *port,
 	pclk = clk_get(NULL, "pclk");
 	pclk_rate = clk_get_rate(pclk);
 	baud = uart_get_baud_rate(port, new, old, 0, 8 * 115200);
+	debug("s3c2440_uart_baud=%d\n", baud);
 	ubrdiv = (pclk_rate / (baud * 16)) - 1;
-	iowrite16(baud, reg_uart(port, UBRDIV));
+	debug("s3c2440 ubrdiv = %d\n", ubrdiv);
+	iowrite16(ubrdiv, reg_uart(port, UBRDIV));
 
 	ulcon = 0;
 	if (new->c_cflag & CSTOPB) {
@@ -98,7 +104,7 @@ static void s3c2440_uart_set_termios(struct uart_port *port,
 			ulcon |= 5 << 3;
 	}
 
-	switch(new->c_cflag * CSIZE) {
+	switch(new->c_cflag & CSIZE) {
 		case CS5:
 			ulcon |= 0;
 			break;
@@ -238,22 +244,15 @@ module_exit(s3c2440_uart_driver_exit);
 static void s3c2440_console_write(struct console *con, const char *s,
 		unsigned count)
 {
-	unsigned long ufstat;
 	struct uart_port *port = &s3c2440_uart_port[con->index];
-	int i = 0;
-	for (i = 0; i < count; ) {
-		ufstat = ioread16(reg_uart(port, UFSTAT));
-		if (!(ufstat & (1 << 14))) {
-			iowrite8(s[i], reg_uart(port, UTXH));
-			i++;
-		}
-	}
+	uart_console_write(port, s, count, 
+		(void (*)(struct uart_port *, int))s3c2440_uart_poll_putchar);
 }
 
 static int s3c2440_console_setup(struct console *con, char *option)
 {
 	struct uart_port *port = &s3c2440_uart_port[con->index];
-	int baud, parity, bits, flow;
+	int baud = 9600, parity = 'n', bits = 8, flow = 0;
 
 	s3c2440_uart_gpio_init();
 	s3c2440_uart_config_port(port, 0);
