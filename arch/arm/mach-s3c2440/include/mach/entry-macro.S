@@ -12,6 +12,7 @@
 
 	.macro get_irqnr_and_base, irqnr, irqstat, base, tmp
 		ldr \irqnr, [\base, #INTOFFSET]
+		tst \base, \base	@clear Z flag
 	.endm
 
 	.macro arch_ret_to_user, tmp1, tmp2
