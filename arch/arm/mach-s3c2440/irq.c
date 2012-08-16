@@ -98,15 +98,24 @@ void s3c2440_init_irq(void)
 	s3c2440_init_reg();
 	for (i = 0; i <= IRQ_ADC; i++) {
 		switch(i) {
+		case IRQ_UART0:
+		case IRQ_UART1:
+		case IRQ_UART2:
+			irq_set_chip_and_handler(i,
+					&s3c2440_irq_chip, handle_level_irq);
+			break;
+		
 		case IRQ_EINT0:
 		case IRQ_EINT1:
 		case IRQ_EINT2:
 			irq_set_chip_and_handler(i,
 				&s3c2440_irq_chip, handle_level_irq);
+			set_irq_flags(i, IRQF_VALID);
 			break;
 		default:
 			irq_set_chip_and_handler(i,
 				&s3c2440_irq_chip, handle_edge_irq);
+			set_irq_flags(i, IRQF_VALID);
 		}
 	}
 	irq_set_chained_handler(IRQ_UART0, s3c2440_uart_demux);
@@ -116,5 +125,6 @@ void s3c2440_init_irq(void)
 	for (i = IRQ_RXD0; i < IRQ_TC; i++) {
 		irq_set_chip_and_handler(i, &s3c2440_uart_chip,
 				handle_level_irq);
+		set_irq_flags(i, IRQF_VALID);
 	}
 }

@@ -21,9 +21,81 @@ MODULE_LICENSE("GPL");
 #define	debug(format,arg...)
 #endif
 
+enum state { STATE_OPEN, STATE_CLOSE};
+
+struct uart_info {
+	enum state state;
+};
+
 static inline void *reg_uart(struct uart_port *port, int offset)
 {
 	return (void *)(port->mapbase + offset);
+}
+
+static irqreturn_t s3c2440_uart_int_tx(int irq, void *dev_id)
+{
+	struct uart_port *port = dev_id;
+	
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t s3c2440_uart_int_rx(int irq, void *dev_id)
+{
+	int size;
+	unsigned long ufstat;
+	unsigned long uerstat;
+	int ch, flag;
+	struct uart_port *port = dev_id;
+	struct uart_info *info = port->private_data;
+	struct tty_struct *tty = port->state->port.tty;
+
+	ufstat = ioread32(reg_uart(port, UFSTAT));
+	size = UFSTAT_RXCNT(ufstat);
+
+	while (size--) {
+		port->icount.rx++;
+		flag = TTY_NORMAL;
+		ch = ioread8(reg_uart(port, URXH));
+		uerstat = ioread8(reg_uart(port, UERSTAT));
+
+		if (uerstat & UERSTAT_BREAK) {
+			port->icount.brk++;
+			uart_handle_break(port);
+			debug(KERN_INFO "s3c2440 uart break char\n");
+			goto ignore_char;
+		}
+
+		if (uerstat & UERSTAT_FRAME) {
+			port->icount.frame++;
+			flag = TTY_FRAME;
+		}
+
+		if (uerstat & UERSTAT_OVERRUN) {
+			port->icount.overrun++;
+			flag = TTY_OVERRUN;
+		}
+
+		if (uerstat & UERSTAT_PARITY) {
+			port->icount.parity++;
+			flag = TTY_PARITY;
+		}
+
+		if (uart_handle_sysrq_char(port, ch)) {
+			debug(KERN_INFO "s3c2440 uart handle sysrq char");
+			goto ignore_char;
+		}
+		
+		if (info->state == STATE_OPEN)
+			uart_insert_char(port, uerstat, UERSTAT_OVERRUN, ch,
+					flag);
+
+	ignore_char:
+		continue;
+	}
+
+	tty_flip_buffer_push(tty);
+
+	return IRQ_HANDLED;
 }
 
 static int s3c2440_uart_startup(struct uart_port *port)
@@ -48,7 +120,7 @@ static void s3c2440_uart_stop_tx(struct uart_port *port)
 
 static void s3c2440_uart_stop_rx(struct uart_port *port)
 {
-
+	/* to handle sysrq when uart is not open like boot time */
 }
 
 #ifdef CONFIG_CONSOLE_POLL
@@ -57,7 +129,7 @@ static int s3c2440_uart_poll_getchar(struct uart_port *port)
 	unsigned long ufstat;
 	do {
 		ufstat = ioread32(reg_uart(port, UFSTAT));
-		if ((ufstat & 0x3F) > 0)
+		if (UFSTAT_RXCNT(ufstat) > 0)
 			return ioread32(reg_uart(port, URXH));
 	} while(1);
 }
@@ -68,7 +140,7 @@ static void s3c2440_uart_poll_putchar(struct uart_port *port, unsigned char c)
 	unsigned long ufstat;
 	do {
 		ufstat = ioread32(reg_uart(port, UFSTAT));
-		if (!(ufstat & (1 << 14))) {
+		if (!(ufstat & UFSTAT_TXFULL)) {
 			iowrite32(c, reg_uart(port, UTXH));
 			return;
 		}
@@ -94,28 +166,28 @@ static void s3c2440_uart_set_termios(struct uart_port *port,
 
 	ulcon = 0;
 	if (new->c_cflag & CSTOPB) {
-		ulcon |= 1 << 2;
+		ulcon |= ULCON_STOPBIT(1);
 	}
 
 	if (new->c_cflag & PARENB) {
 		if (new->c_cflag & PARODD)
-			ulcon |= 4 << 3;
+			ulcon |= ULCON_PARITY(4);
 		else
-			ulcon |= 5 << 3;
+			ulcon |= ULCON_PARITY(5);
 	}
 
 	switch(new->c_cflag & CSIZE) {
 		case CS5:
-			ulcon |= 0;
+			ulcon |= ULCON_WORDLEN(0);
 			break;
 		case CS6:
-			ulcon |= 1;
+			ulcon |= ULCON_WORDLEN(1);
 			break;
 		case CS7:
-			ulcon |= 2;
+			ulcon |= ULCON_WORDLEN(2);
 			break;
 		case CS8:
-			ulcon |= 3;
+			ulcon |= ULCON_WORDLEN(3);
 			break;
 	};
 
@@ -131,17 +203,19 @@ static void s3c2440_uart_config_port(struct uart_port *port, int flag)
 	unsigned long clkcon = ioread32(REG_CLK(CLKCON));
 	clkcon |= 0x00000400 << port->line;
 	iowrite32(clkcon, REG_CLK(CLKCON));
-	iowrite32((2 << 10) | (1 << 2) | 1, reg_uart(port, UCON));
-	iowrite8((3 << 6) | (3 << 4) | 7, reg_uart(port, UFCON));
+	iowrite32(UCON_CLOCKSEL(2) | UCON_RXTIMEOUT(1) | UCON_TXMODE(1) |
+			UCON_RXMODE(1), reg_uart(port, UCON));
+	iowrite8(UFCON_TXTRIGGER(3) | UFCON_RXTRIGGER(3) | UFCON_TXFIFORST |
+			UFCON_RXFIFORST | UFCON_FIFOEN, reg_uart(port, UFCON));
 	iowrite8(0x0, reg_uart(port, UMCON));
 }
 
 static void s3c2440_uart_break_ctl(struct uart_port *port, int ctl)
 {
-	unsigned long ulcon;
-	ulcon = ioread32(reg_uart(port, ULCON));
-	ulcon |= 1 << 4;
-	iowrite32(ulcon, reg_uart(port, ULCON));
+	unsigned long ucon;
+	ucon = ioread32(reg_uart(port, UCON));
+	ucon |= UCON_SENDBRK;
+	iowrite32(ucon, reg_uart(port, UCON));
 }
 
 static struct uart_driver s3c2440_uart_driver = {
@@ -189,6 +263,18 @@ static struct uart_port s3c2440_uart_port[] = {
 	},
 };
 
+struct uart_info s3c2440_uart_info[] = {
+	[0] = {
+		.state = STATE_CLOSE,
+	},
+	[1] = {
+		.state = STATE_CLOSE,
+	},
+	[2] = {
+		.state = STATE_CLOSE,
+	},
+};
+
 static void s3c2440_uart_gpio_init(void)
 {
 	unsigned long gphcon;
@@ -199,21 +285,55 @@ static void s3c2440_uart_gpio_init(void)
 	iowrite32(gphcon, REG_GPIO(GPHCON));
 }
 
+static int s3c2440_uart_int_rx_init(void)
+{
+	int i, j;
+	int ret;
+
+	for (i = IRQ_RXD0, j = 0; i <= IRQ_RXD2; i += 3, j++) {
+		ret = request_irq(i, s3c2440_uart_int_rx, 0, "rx irq",
+				&s3c2440_uart_port[j]);
+		if (ret) {
+			printk(KERN_INFO "s3c2440 uart request_irq error:%d\n",
+					ret);
+			goto request_irq_error;
+		}
+	}
+
+	return ret;
+
+request_irq_error:
+	for (i -= 3, j--; i >= IRQ_RXD0; i -= 3, j--) {
+		free_irq(i, &s3c2440_uart_port[j]);
+	}
+	
+	return ret;
+}
+
 static int s3c2440_uart_driver_init(void)
 {
 	int ret;
 	int i;
 
 	s3c2440_uart_gpio_init();
+	
+	ret = s3c2440_uart_int_rx_init();
+
+	if (ret) {
+		debug(KERN_INFO "s3c2440 uart request irq error %d\n", ret);
+		goto error_int_rx_init;
+	}
 
 	ret = uart_register_driver(&s3c2440_uart_driver);
-	if (ret < 0)
+	if (ret)
 		goto error_reg_drv;
 	
 	for (i = 0; i < ARRAY_SIZE(s3c2440_uart_port); i++) {
 		ret = uart_add_one_port(&s3c2440_uart_driver,
 				&s3c2440_uart_port[i]);
-		if (ret < 0) {
+		s3c2440_uart_port[i].private_data = &s3c2440_uart_info[i];
+
+		if (ret) {
 			for (i--; i >= 0; i--) {
 				uart_remove_one_port(&s3c2440_uart_driver,
 					&s3c2440_uart_port[i]);
@@ -227,6 +347,7 @@ static int s3c2440_uart_driver_init(void)
 error_reg_port:
 	uart_unregister_driver(&s3c2440_uart_driver);
 error_reg_drv:
+error_int_rx_init:
 	return ret;
 }
 
