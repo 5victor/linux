@@ -63,7 +63,7 @@ static int s3c2440_uart_poll_getchar(struct uart_port *port)
 }
 #endif
 
-static void s3c2440_uart_poll_putchar(struct uart_port *port, unsigned char *c)
+static void s3c2440_uart_poll_putchar(struct uart_port *port, unsigned char c)
 {
 	unsigned long ufstat;
 	do {

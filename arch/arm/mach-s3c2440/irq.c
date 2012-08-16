@@ -30,10 +30,17 @@ static void s3c2440_irq_ack(struct irq_data *data)
 	iowrite32(1 << data->irq, REG_INT(INTPND));
 }
 
+static void s3c2440_irq_disable(struct irq_data *data)
+{
+	s3c2440_irq_mask(data);
+	/* I don't known what irq disable need do clear INTPND? */
+}
+
 static struct irq_chip s3c2440_irq_chip = {
 	.irq_mask	= s3c2440_irq_mask,
 	.irq_unmask	= s3c2440_irq_unmask,
 	.irq_ack	= s3c2440_irq_ack,
+	.irq_disable	= s3c2440_irq_disable,
 };
 
 static void s3c2440_uart_demux(unsigned int irq, struct irq_desc *desc)

@@ -29,9 +29,7 @@ static void s3c2440_timer_setup(void)
 	unsigned long intmsk;
 	struct clk *pclk;
 
-	intmsk = ioread32(REG_INT(INTMSK));
-	intmsk &= ~(1 << 15);
-	iowrite32(intmsk, REG_INT(INTMSK));
+	enable_irq(IRQ_TIMER4);
 
 	pclk = clk_get(NULL, "pclk");
 	if (IS_ERR(pclk))
