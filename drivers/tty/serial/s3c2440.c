@@ -222,6 +222,8 @@ static int s3c2440_uart_driver_init(void)
 		}
 	}
 
+	return ret;
+
 error_reg_port:
 	uart_unregister_driver(&s3c2440_uart_driver);
 error_reg_drv:
