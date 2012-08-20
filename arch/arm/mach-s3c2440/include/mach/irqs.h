@@ -77,4 +77,14 @@
 
 #define NR_IRQS	67
 
+enum eint_trigger {
+	low_level	= 0,
+	high_level	= 1,
+	failling_edge	= 3,
+	rising_edge	= 5,
+	both_edge	= 7
+};
+
+void s3c2440_eint_trigger(unsigned int irq, enum eint_trigger trigger);
+
 #endif

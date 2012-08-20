@@ -45,4 +45,6 @@
 #define GSTATUS4	0XBC
 #define MSLCON		0XCC
 
+#include <mach/map.h>
+#define REG_GPIO(x)	(S3C2440_VA_GPIO + (x))
 #endif

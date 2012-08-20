@@ -1,7 +1,9 @@
 #include <linux/irq.h>
+#include <linux/module.h>
 #include <asm/io.h>
 #include <mach/map.h>
 #include <mach/regs-int.h>
+#include <mach/regs-gpio.h>
 
 static void s3c2440_init_reg(void)
 {
@@ -10,6 +12,8 @@ static void s3c2440_init_reg(void)
 	iowrite32(0xFFFFFFFF, REG_INT(SRCPND));
 	iowrite32(0XFFFFFFFF, REG_INT(INTPND));
 	iowrite32(0xFFFFFFFF, REG_INT(INTMSK));
+	iowrite32(0xFFFFFFFF, REG_GPIO(EINTMASK));
+	iowrite32(0xFFFFFFFF, REG_GPIO(EINTPEND));
 }
 
 static void s3c2440_irq_mask(struct irq_data *data)
@@ -92,6 +96,83 @@ static struct irq_chip s3c2440_uart_chip = {
 	.irq_ack	= s3c2440_uart_ack,
 };
 
+static void s3c2440_eint_demux(unsigned int irq, struct irq_desc *desc)
+{
+	int i;
+	unsigned long eintpend = ioread32(REG_GPIO(EINTPEND));
+	unsigned long eintmask = ioread32(REG_GPIO(EINTMASK));
+	eintpend &= eintmask;
+
+	for (i = 4; i < 24; i++) {
+		if (eintpend & (1 << i)) {
+			generic_handle_irq(IRQ_EINT4 + i - 4);
+			break;
+		}
+	}
+}
+
+static void s3c2440_eint_mask(struct irq_data *data)
+{
+	int eintmask = ioread32(REG_GPIO(EINTMASK));
+	eintmask |= 1 << (data->irq - IRQ_EINT4 + 4);
+	iowrite32(eintmask, REG_GPIO(EINTMASK));
+}
+
+static void s3c2440_eint_unmask(struct irq_data *data)
+{
+	int eintmask = ioread32(REG_GPIO(EINTMASK));
+	eintmask &= ~(1 << (data->irq - IRQ_EINT4 + 4));
+	iowrite32(eintmask, REG_GPIO(EINTMASK));
+
+}
+
+static void s3c2440_eint_ack(struct irq_data *data)
+{
+	iowrite32(1 << (data->irq - IRQ_EINT4 + 4), REG_GPIO(EINTPEND));
+}
+
+static void s3c2440_eint_enable(struct irq_data *data)
+{
+	unsigned long gpcon;
+
+	if (data->irq < IRQ_EINT8) {
+		gpcon = ioread32(REG_GPIO(GPFCON));
+		gpcon &= ~(3 << 2 * (data->irq - IRQ_EINT4));
+		gpcon |= 2 << 2 * (data->irq - IRQ_EINT4);
+		iowrite32(gpcon, REG_GPIO(GPFCON));
+	} else {
+		gpcon = ioread32(REG_GPIO(GPGCON));
+		gpcon &= ~(3 << 2 * (data->irq - IRQ_EINT8));
+		gpcon |= 2 << 2 * (data->irq - IRQ_EINT8);
+		iowrite32(gpcon, REG_GPIO(GPGCON));
+	}
+	s3c2440_eint_unmask(data);
+}
+
+static void s3c2440_eint_disable(struct irq_data *data)
+{
+	unsigned long gpcon;
+
+	if (data->irq < IRQ_EINT8) {
+		gpcon = ioread32(REG_GPIO(GPFCON));
+		gpcon &= ~(3 << 2 * (data->irq - IRQ_EINT4));
+		iowrite32(gpcon, REG_GPIO(GPFCON));
+	} else {
+		gpcon = ioread32(REG_GPIO(GPGCON));
+		gpcon &= ~(3 << 2 * (data->irq - IRQ_EINT8));
+		iowrite32(gpcon, REG_GPIO(GPGCON));
+	}
+	s3c2440_eint_mask(data);
+}
+
+static struct irq_chip s3c2440_eint_chip = {
+	.irq_enable	= s3c2440_eint_enable,
+	.irq_disable	= s3c2440_eint_disable,
+	.irq_mask	= s3c2440_eint_mask,
+	.irq_unmask	= s3c2440_eint_unmask,
+	.irq_ack	= s3c2440_eint_ack,
+};
+
 void s3c2440_init_irq(void)
 {
 	int i;
@@ -115,7 +196,7 @@ void s3c2440_init_irq(void)
 		default:
 			irq_set_chip_and_handler(i,
 				&s3c2440_irq_chip, handle_edge_irq);
-			set_irq_flags(i, IRQF_VALID);
+			set_irq_flags(i, IRQF_VALID | IRQF_NOAUTOEN);
 		}
 	}
 	irq_set_chained_handler(IRQ_UART0, s3c2440_uart_demux);
@@ -125,6 +206,31 @@ void s3c2440_init_irq(void)
 	for (i = IRQ_RXD0; i < IRQ_TC; i++) {
 		irq_set_chip_and_handler(i, &s3c2440_uart_chip,
 				handle_level_irq);
-		set_irq_flags(i, IRQF_VALID);
+		set_irq_flags(i, IRQF_VALID | IRQF_NOAUTOEN);
+	}
+
+	irq_set_chained_handler(IRQ_EINT4_7, s3c2440_eint_demux);
+	irq_set_chained_handler(IRQ_EINT8_23, s3c2440_eint_demux);
+
+	for (i = IRQ_EINT4; i <= IRQ_EINT23; i++) {
+		irq_set_chip_and_handler(i, &s3c2440_eint_chip,
+				handle_level_irq);
+		set_irq_flags(i, IRQF_VALID | IRQF_NOAUTOEN);
 	}
 }
+
+void s3c2440_eint_trigger(unsigned int irq, enum eint_trigger trigger)
+{
+	int reg_offset = (irq - IRQ_EINT4) / 8;
+	int bit_offset = 4 * ((irq - IRQ_EINT4) % 8);
+	int reg = REG_GPIO(EXTINT0) + 4 * reg_offset;
+
+	int extint = ioread32(reg);
+	
+	extint &= ~(7 << bit_offset);
+	extint |= trigger << bit_offset;
+	iowrite32(extint, reg);
+}
+
+EXPORT_SYMBOL(s3c2440_eint_trigger);
+

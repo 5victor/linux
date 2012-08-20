@@ -17,6 +17,12 @@ config MDIO
 config SUNGEM_PHY
 	tristate
 
+config DM9000
+	tristate "DM9000 Support"
+	depends on ARM
+	help
+	    DM9000 BY VICTOR WEN
+
 source "drivers/net/ethernet/3com/Kconfig"
 source "drivers/net/ethernet/adaptec/Kconfig"
 source "drivers/net/ethernet/aeroflex/Kconfig"
@@ -31,7 +37,6 @@ source "drivers/net/ethernet/brocade/Kconfig"
 source "drivers/net/ethernet/chelsio/Kconfig"
 source "drivers/net/ethernet/cirrus/Kconfig"
 source "drivers/net/ethernet/cisco/Kconfig"
-source "drivers/net/ethernet/davicom/Kconfig"
 
 config DNET
 	tristate "Dave ethernet support (DNET)"
