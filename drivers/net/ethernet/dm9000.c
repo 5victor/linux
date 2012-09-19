@@ -35,6 +35,12 @@ struct dm9k_info {
 	int	packet2_len;
 };
 
+struct rx_info {
+	u8	ready;
+	u8	status;
+	u16	lenght;
+} __attribute__ ((packed));
+
 static u8 read_reg_u8(struct dm9k_info *info, u8 index)
 {
 	iowrite8(index, info->index);
@@ -116,7 +122,6 @@ static void dump_skb(struct sk_buff *skb)
 static void dm9000_dump_reg(struct dm9k_info *info)
 {
 	int i;
-	u16 reg;
 
 	printk(KERN_INFO "dm9000 dump reg:\n");
 	for (i = 0; i < SMCR; i++) {
@@ -142,7 +147,7 @@ static void dm9000_init(struct dm9k_info *info)
 	reg_u16 = read_reg_u16(info, VID);
 	printk(KERN_INFO "dm9000:VID 0x%x, PID 0x%x\n", reg_u16,
 			read_reg_u16(info, PID));
-	printk(KERN_INFO "dm9000:ISR 0b%b\n", read_reg_u8(info, ISR));
+	printk(KERN_INFO "dm9000:ISR 0x%x\n", read_reg_u8(info, ISR));
 
 	write_reg_u8(info, GPR, 0);
 
@@ -161,6 +166,36 @@ static void dm9000_tx_packet(struct dm9k_info *info, int len)
 	tcr |= 1;
 	write_reg_u8(info, TCR, tcr);
 
+}
+
+static void dm9000_rx_packet(struct net_device *ndev)
+{
+	struct dm9k_info *info = netdev_priv(ndev);
+	u8 ready = read_reg_u8(info, MRCMDX);
+	struct rx_info rx_info;
+	struct sk_buff *skb;
+	void *buf;
+
+	debug(KERN_INFO "dm9000:%s\n", __func__);
+	if (!ready)
+		return ;
+	
+	read_bulk_u16(info, MRCMD, &rx_info, sizeof(struct rx_info)); 
+	
+	skb = dev_alloc_skb(rx_info.lenght + NET_IP_ALIGN);
+	if (skb != NULL) {
+		debug(KERN_INFO "dm9000:dmup skb pointer \n"); 
+		skb_reserve(skb, NET_IP_ALIGN);
+		buf = skb_put(skb, rx_info.lenght);
+		read_bulk_u16(info, MRCMD, buf, rx_info.lenght);
+		
+		printk(KERN_INFO "dump rx packet:\n");
+		dump_skb(skb);
+
+		skb->protocol = eth_type_trans(skb, ndev);
+
+		netif_rx(skb);
+	}
 }
 
 irqreturn_t dm9000_int_handler(int irq, void *dev_id)
@@ -182,6 +217,7 @@ irqreturn_t dm9000_int_handler(int irq, void *dev_id)
 	}
 
 	if (isr & ISR_PRS) {
+		dm9000_rx_packet(ndev);
 		write_reg_u8(info, ISR, ISR_PRS);
 	}
 
