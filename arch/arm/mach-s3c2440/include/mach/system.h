@@ -1,3 +1,4 @@
+#include <asm/proc-fns.h>
 
 static void arch_reset(char mode, const char *cmd)
 {
@@ -6,5 +7,5 @@ static void arch_reset(char mode, const char *cmd)
 
 static void arch_idle(void)
 {
-	panic("not imp");
+	cpu_do_idle();
 }

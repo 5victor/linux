@@ -52,6 +52,10 @@ static void s3c2440_uart_demux(unsigned int irq, struct irq_desc *desc)
 	unsigned long subsrcpnd;
 	int offset;
 	int i;
+	struct irq_data *data = irq_desc_get_irq_data(desc);
+	
+	s3c2440_irq_mask(data);
+	s3c2440_irq_ack(data);
 
 	subsrcpnd = ioread32(REG_INT(SUBSRCPND));
 	offset = irq - IRQ_UART0;
@@ -62,6 +66,7 @@ static void s3c2440_uart_demux(unsigned int irq, struct irq_desc *desc)
 			generic_handle_irq(IRQ_RXD0 + offset + i);
 	}
 
+	s3c2440_irq_unmask(data);
 }
 
 static void s3c2440_uart_mask(struct irq_data *data)
@@ -101,14 +106,19 @@ static void s3c2440_eint_demux(unsigned int irq, struct irq_desc *desc)
 	int i;
 	unsigned long eintpend = ioread32(REG_GPIO(EINTPEND));
 	unsigned long eintmask = ioread32(REG_GPIO(EINTMASK));
-	eintpend &= eintmask;
-
+	struct irq_data *data = irq_desc_get_irq_data(desc);
+	eintpend &= ~eintmask;
+		
+	
+	s3c2440_irq_mask(data);
+	s3c2440_irq_ack(data);
 	for (i = 4; i < 24; i++) {
 		if (eintpend & (1 << i)) {
 			generic_handle_irq(IRQ_EINT4 + i - 4);
 			break;
 		}
 	}
+	s3c2440_irq_unmask(data);
 }
 
 static void s3c2440_eint_mask(struct irq_data *data)
@@ -137,8 +147,8 @@ static void s3c2440_eint_enable(struct irq_data *data)
 
 	if (data->irq < IRQ_EINT8) {
 		gpcon = ioread32(REG_GPIO(GPFCON));
-		gpcon &= ~(3 << 2 * (data->irq - IRQ_EINT4));
-		gpcon |= 2 << 2 * (data->irq - IRQ_EINT4);
+		gpcon &= ~(3 << 2 * (data->irq - IRQ_EINT4 + 4));
+		gpcon |= 2 << 2 * (data->irq - IRQ_EINT4 + 4);
 		iowrite32(gpcon, REG_GPIO(GPFCON));
 	} else {
 		gpcon = ioread32(REG_GPIO(GPGCON));
@@ -155,7 +165,7 @@ static void s3c2440_eint_disable(struct irq_data *data)
 
 	if (data->irq < IRQ_EINT8) {
 		gpcon = ioread32(REG_GPIO(GPFCON));
-		gpcon &= ~(3 << 2 * (data->irq - IRQ_EINT4));
+		gpcon &= ~(3 << 2 * (data->irq - IRQ_EINT4 + 4));
 		iowrite32(gpcon, REG_GPIO(GPFCON));
 	} else {
 		gpcon = ioread32(REG_GPIO(GPGCON));
@@ -221,8 +231,8 @@ void s3c2440_init_irq(void)
 
 void s3c2440_eint_trigger(unsigned int irq, enum eint_trigger trigger)
 {
-	int reg_offset = (irq - IRQ_EINT4) / 8;
-	int bit_offset = 4 * ((irq - IRQ_EINT4) % 8);
+	int reg_offset = (irq - IRQ_EINT4 + 4) / 8;
+	int bit_offset = 4 * ((irq - IRQ_EINT4 + 4) % 8);
 	int reg = REG_GPIO(EXTINT0) + 4 * reg_offset;
 
 	int extint = ioread32(reg);
