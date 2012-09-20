@@ -7,6 +7,15 @@ config MACH_MINI2440
 	help
 		mini2440 board support
 
+config MACH_MINI2440_LEDS_TIMER
+	bool "mini2440 leds timer"
+	depends on MACH_MINI2440
+	select LEDS
+	select LEDS_TIMER
+	help
+		mini2440 leds timer support
+
+
 endmenu
 
 endif

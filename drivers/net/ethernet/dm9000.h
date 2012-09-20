@@ -7,7 +7,15 @@
 #define TSR1	0x03
 #define TSR2	0x04
 #define RCR	0x05
+
 #define RSR	0x06
+#define RSR_LCS	(1 << 5)
+#define RSR_RWTO	(1 << 4)
+#define RSR_PLE	(1 << 3)
+#define RSR_AE	(1 << 2)
+#define RSR_CE	(1 << 1)
+#define RSR_FOE	(1 << 0)
+
 #define ROCR	0x07
 #define BPTR	0x08
 #define FCTR	0x09
@@ -36,6 +44,8 @@
 #define ISR	0xFE
 #define ISR_PTS	(1 << 1)
 #define ISR_PRS	(1)
+#define ISR_ROS	(1 << 2)
+#define ISR_ROOS	(1 << 3)
 
 #define IMR	0xFF
 
