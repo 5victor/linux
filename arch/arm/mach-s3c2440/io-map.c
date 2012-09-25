@@ -44,6 +44,11 @@ static struct map_desc s3c2440_iodesc[] __initdata = {
 		.pfn		= __phys_to_pfn(S3C2440_PA_TIMER),
 		.length		= SZ_4K,
 		.type		= MT_DEVICE,
+	}, {
+		.virtual	= S3C2440_VA_NAND,
+		.pfn		= __phys_to_pfn(S3C2440_PA_NAND),
+		.length		= SZ_4K,
+		.type		= MT_DEVICE,
 	},
 };
 

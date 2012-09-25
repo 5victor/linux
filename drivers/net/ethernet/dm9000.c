@@ -11,7 +11,7 @@
 
 #include "dm9000.h"
 
-#define DEBUG
+/* #define DEBUG */
 
 #ifdef DEBUG
 #define debug(fmt, ARG...)	printk(fmt, ##ARG)
@@ -112,12 +112,17 @@ static void write_bulk_u16(struct dm9k_info *info, u8 index, u16 *buf, int size)
 	}
 }
 
+#ifdef DEBUG
 static void dump_skb(struct sk_buff *skb)
 {
 	printk(KERN_INFO "dm9000 dump skbuff:\n");
 	print_hex_dump(KERN_INFO, "\t", DUMP_PREFIX_OFFSET,
 		16, 1, skb->data, skb->len, 0);
 }
+#else
+#define dump_skb(skb)
+
+#endif
 
 static void dm9000_dump_reg(struct dm9k_info *info)
 {
@@ -396,22 +401,9 @@ static int dm9000_module_init(void)
 /*	dm9000_reset(info);
 	dm9000_init(info);
 */
-	
-	printk(KERN_INFO "ORIGIN MAC ADDR:");
-	for (i = 0; i < 6; i++) {
-		printk(KERN_INFO "%x", ndev->dev_addr[i]);
-	}
-	printk("\n");
-
 	if (!is_valid_ether_addr(ndev->dev_addr)) {
 		random_ether_addr(ndev->dev_addr);
 	}
-
-	printk(KERN_INFO "RANDOM MAC ADDR:");
-	for (i = 0; i < 6; i++) {
-		printk(KERN_INFO "%x", ndev->dev_addr[i]);
-	}
-	printk("\n");
 
 	ret = register_netdev(ndev);
 	
