@@ -111,13 +111,13 @@ static void s3c2440_eint_demux(unsigned int irq, struct irq_desc *desc)
 		
 	
 	s3c2440_irq_mask(data);
-	s3c2440_irq_ack(data);
 	for (i = 4; i < 24; i++) {
 		if (eintpend & (1 << i)) {
 			generic_handle_irq(IRQ_EINT4 + i - 4);
 			break;
 		}
 	}
+	s3c2440_irq_ack(data);
 	s3c2440_irq_unmask(data);
 }
 
@@ -128,17 +128,20 @@ static void s3c2440_eint_mask(struct irq_data *data)
 	iowrite32(eintmask, REG_GPIO(EINTMASK));
 }
 
-static void s3c2440_eint_unmask(struct irq_data *data)
-{
-	int eintmask = ioread32(REG_GPIO(EINTMASK));
-	eintmask &= ~(1 << (data->irq - IRQ_EINT4 + 4));
-	iowrite32(eintmask, REG_GPIO(EINTMASK));
-
-}
-
 static void s3c2440_eint_ack(struct irq_data *data)
 {
 	iowrite32(1 << (data->irq - IRQ_EINT4 + 4), REG_GPIO(EINTPEND));
+}
+
+static void s3c2440_eint_unmask(struct irq_data *data)
+{
+	int eintmask = ioread32(REG_GPIO(EINTMASK));
+
+	s3c2440_eint_ack(data); /* because eintmask doesn't work*/
+
+	eintmask &= ~(1 << (data->irq - IRQ_EINT4 + 4));
+	iowrite32(eintmask, REG_GPIO(EINTMASK));
+
 }
 
 static void s3c2440_eint_enable(struct irq_data *data)

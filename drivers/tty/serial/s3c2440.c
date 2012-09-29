@@ -262,6 +262,13 @@ static void s3c2440_uart_enable_ms(struct uart_port *port)
 
 }
 
+static unsigned int s3c2440_uart_tx_empty(struct uart_port *port)
+{
+	unsigned long utrstat = ioread32(reg_uart(port, UTRSTAT));
+
+	return utrstat & (1 << 2);
+}
+
 static struct console s3c2440_console;
 
 static struct uart_driver s3c2440_uart_driver = {
@@ -290,6 +297,7 @@ static struct uart_ops s3c2440_uart_ops = {
 	.set_mctrl	= s3c2440_uart_set_mctrl,
 	.get_mctrl	= s3c2440_uart_get_mctrl,
 	.enable_ms	= s3c2440_uart_enable_ms,
+	.tx_empty	= s3c2440_uart_tx_empty,
 };
 
 static struct uart_port s3c2440_uart_port[] = {

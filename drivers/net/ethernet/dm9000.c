@@ -11,7 +11,7 @@
 
 #include "dm9000.h"
 
-/* #define DEBUG */
+#define DEBUG
 
 #ifdef DEBUG
 #define debug(fmt, ARG...)	printk(fmt, ##ARG)
@@ -183,7 +183,7 @@ static void dm9000_rx_packet(struct net_device *ndev)
 
 	debug(KERN_INFO "dm9000:%s\n", __func__);
 	if (!ready) {
-		printk(KERN_INFO "dm9000:packet not read interrupt ocurr\n");
+		printk(KERN_INFO "dm9000:packet not ready interrupt ocurr\n");
 		return ;
 	}
 
@@ -224,18 +224,18 @@ static void dm9000_rx_packet(struct net_device *ndev)
 		return ;
 	}
 
-	skb = dev_alloc_skb(rx_info.lenght + NET_IP_ALIGN);
+	skb = dev_alloc_skb(rx_info.lenght + 4);
 	if (skb != NULL) {
 		debug(KERN_INFO "dm9000:dmup skb pointer \n"); 
 		skb_reserve(skb, NET_IP_ALIGN);
-		buf = skb_put(skb, rx_info.lenght);
+		buf = skb_put(skb, rx_info.lenght - 4);
 		read_bulk_u16(info, MRCMD, buf, rx_info.lenght);
 		
-		printk(KERN_INFO "dump rx packet:\n");
+		debug(KERN_INFO "dump rx packet:\n");
 		dump_skb(skb);
 
 		skb->protocol = eth_type_trans(skb, ndev);
-
+		debug(KERN_INFO "dm9000 FOR DEBUG delay:netif_rx called\n");
 		netif_rx(skb);
 	}
 }
@@ -252,12 +252,10 @@ irqreturn_t dm9000_int_handler(int irq, void *dev_id)
 
 	if (isr & ISR_ROS) {
 		debug(KERN_INFO "dm9000:ISR_ROS\n");
-		write_reg_u8(info, ISR, ISR_ROS);
 	}
 
 	if (isr & ISR_ROOS) {
 		debug(KERN_INFO "dm9000:ISR_ROOS\n");
-		write_reg_u8(info, ISR, ISR_ROOS);
 	}
 
 	if (isr & ISR_PTS) {
@@ -266,16 +264,14 @@ irqreturn_t dm9000_int_handler(int irq, void *dev_id)
 			dm9000_tx_packet(info, info->packet2_len);
 			netif_start_queue(ndev);
 		}
-		
-		write_reg_u8(info, ISR, ISR_PTS);
 	}
 
 	if (isr & ISR_PRS) {
 		dm9000_rx_packet(ndev);
-		write_reg_u8(info, ISR, ISR_PRS);
 	}
 
 
+	write_reg_u8(info, ISR, isr);
 	debug(KERN_INFO "----------------------------End %s--------------"
 			"-----------------\n", __func__);	
 
