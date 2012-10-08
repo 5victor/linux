@@ -100,6 +100,13 @@ static int s3c2440_pclk_get_rate(struct clk *clk)
 	return (clkdivn & 0x1) ? hclk_rate / 2 : hclk_rate;
 }
 
+static void s3c2440_uclk_setup(void)
+{
+	unsigned long upllcon;
+	upllcon = (0x38 << 12) | (2 << 4) | 2;
+	iowrite32(upllcon, REG_CLK(UPLLCON));
+}
+
 static struct clk s3c2440_clk[] = {
 	{
 		.name	= "fclk",
@@ -121,6 +128,12 @@ static struct clk s3c2440_clk[] = {
 		.parent	= &s3c2440_clk[1],
 		.setup	= s3c2440_pclk_setup,
 		.get_rate	= s3c2440_pclk_get_rate,
+	}, {
+		.name	= "uclk",
+		.id	= -1,
+		.rate	= -1,
+		.parent = NULL,
+		.setup	= s3c2440_uclk_setup,
 	},
 };
 

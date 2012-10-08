@@ -33,6 +33,7 @@ struct dm9k_info {
 	void	*data;
 	int	queue_packet;
 	int	packet2_len;
+	int	ip_summed;
 };
 
 struct rx_info {
@@ -160,16 +161,24 @@ static void dm9000_init(struct dm9k_info *info)
 	write_reg_u8(info, IMR, 0xFF);
 
 	write_reg_u8(info, RCR, 1);
+
+	write_reg_u8(info, TCR, 0);
+	write_reg_u8(info, BPTR, 0x3f);
+	write_reg_u8(info, FCR, 0xff);
+	write_reg_u8(info, SMCR, 0);
 }
 
-static void dm9000_tx_packet(struct dm9k_info *info, int len)
+static void dm9000_tx_packet(struct dm9k_info *info, int ip_summed,  int len)
 {
 	debug(KERN_INFO "dm9000:tx packet len = %d\n", len);
+
+	if (ip_summed == CHECKSUM_NONE) {
+		debug(KERN_INFO "dm9000: CHECKSUM_NONE");
+	}
+
 	write_reg_u16(info, TXPL, len);
 
-	u8 tcr = read_reg_u8(info, TCR);
-	tcr |= 1;
-	write_reg_u8(info, TCR, tcr);
+	write_reg_u8(info, TCR, 1);
 
 }
 
@@ -261,7 +270,7 @@ irqreturn_t dm9000_int_handler(int irq, void *dev_id)
 	if (isr & ISR_PTS) {
 		info->queue_packet--;
 		if (info->queue_packet > 0) {
-			dm9000_tx_packet(info, info->packet2_len);
+			dm9000_tx_packet(info, info->ip_summed, info->packet2_len);
 			netif_start_queue(ndev);
 		}
 	}
@@ -294,6 +303,8 @@ static int dm9000_open(struct net_device *ndev)
 	printk(KERN_INFO "dm9000: link ok\n");
 	
 	netif_start_queue(ndev);
+
+	netif_carrier_on(ndev);
 
 	debug("dm9000_open: tx queue stopped %d\n", netif_queue_stopped(ndev));
 	
@@ -330,10 +341,11 @@ static netdev_tx_t dm9000_start_xmit(struct sk_buff *skb,
 	write_bulk_u16(info, MWCMD, skb->data, skb->len);
 	debug(KERN_INFO "dm9000:TX Pointer:%d\n", read_reg_u16(info, MWR));
 	if (info->queue_packet++ == 0)
-		dm9000_tx_packet(info, skb->len);
+		dm9000_tx_packet(info, skb->ip_summed, skb->len);
 	else {
 		netif_stop_queue(ndev);
 		info->packet2_len = skb->len;
+		info->ip_summed = skb->ip_summed;
 	}
 
 	dev_kfree_skb(skb);
@@ -392,8 +404,9 @@ static int dm9000_module_init(void)
 	ndev->netdev_ops = &dm9000_netdev_ops;
 	ndev->watchdog_timeo = msecs_to_jiffies(1000);
 
-	request_irq(ndev->irq, dm9000_int_handler, 0, "dm9000", ndev);
 	s3c2440_eint_trigger(ndev->irq, high_level);
+	request_irq(ndev->irq, dm9000_int_handler, 0, "dm9000", ndev);
+	disable_irq(ndev->irq);
 /*	dm9000_reset(info);
 	dm9000_init(info);
 */

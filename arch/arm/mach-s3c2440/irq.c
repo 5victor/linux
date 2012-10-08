@@ -228,7 +228,7 @@ void s3c2440_init_irq(void)
 	for (i = IRQ_EINT4; i <= IRQ_EINT23; i++) {
 		irq_set_chip_and_handler(i, &s3c2440_eint_chip,
 				handle_level_irq);
-		set_irq_flags(i, IRQF_VALID | IRQF_NOAUTOEN);
+		set_irq_flags(i, IRQF_VALID);
 	}
 }
 
