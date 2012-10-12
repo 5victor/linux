@@ -206,6 +206,11 @@ void s3c2440_init_irq(void)
 				&s3c2440_irq_chip, handle_level_irq);
 			set_irq_flags(i, IRQF_VALID);
 			break;
+		case IRQ_USBD:
+			irq_set_chip_and_handler(i,
+				&s3c2440_irq_chip, handle_level_irq);
+			set_irq_flags(i, IRQF_VALID | IRQF_NOAUTOEN);
+			break;
 		default:
 			irq_set_chip_and_handler(i,
 				&s3c2440_irq_chip, handle_edge_irq);

@@ -7,11 +7,12 @@ struct s3c2440_ep {
 	struct usb_ep ep;
 };
 
-enum ep0_state {IDLE, CONFIG};
+enum ep0_state {IDLE, DATA_IN, DATA_OUT};
 
 struct s3c2440_gadget {
 	struct usb_gadget_driver *driver;
 	struct usb_gadget gadget;
+	struct s3c2440_ep *ep;
 	enum ep0_state ep0_state;
 };
 
