@@ -11,7 +11,7 @@
 
 #include "dm9000.h"
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define debug(fmt, ARG...)	printk(fmt, ##ARG)

@@ -44,6 +44,25 @@ static void dump_usb_ctrlrequest(struct usb_ctrlrequest *ctrl_req)
 
 #endif
 
+#ifdef DEBUG
+
+static void dump_usb_request(struct usb_request *req)
+{
+	printk(KERN_INFO "s3c2440 udc:dump usb_request\n"
+			"\tlength:0x%x\n"
+			"\tactual:0x%x\n"
+			"\tzero:%d\n",
+			req->length, req->actual, req->zero);
+	print_hex_dump(KERN_INFO, NULL, DUMP_PREFIX_OFFSET, 8, 1,
+			req->buf, req->length, 0);
+}
+
+#else
+
+#define dump_usb_request(x)
+
+#endif
+
 static void s3c2440_ep_write_fifo(int index, char *buf, int len)
 {
 	int i;
@@ -61,6 +80,8 @@ static void s3c2440_ep_read_fifo(int index, char *buf, int len)
 		buf[i] = ioread8(REG_UDC(EPn_FIFO_REG(index)));
 	}
 }
+
+/*
 
 static void s3c2440_ep0_read_ctrl_req(struct usb_ctrlrequest *ctrl_req)
 {
@@ -88,12 +109,48 @@ static void s3c2440_ep0_data_end(void)
 	iowrite8(ep0_csr, REG_UDC(EP0_CSR));
 }
 
+*/
+
 static void s3c2440_ep0_out_data_end(void)
 {
 	u8 ep0_csr = ioread8(REG_UDC(EP0_CSR));
 
 	ep0_csr |= (1 << 6) | (1 << 3);
 	iowrite8(ep0_csr, REG_UDC(EP0_CSR));
+}
+
+static void s3c2440_ep0_in_data_end(void)
+{
+	u8 ep0_csr = ioread8(REG_UDC(EP0_CSR));
+
+	ep0_csr |= (1 << 3) | (1 << 1);
+	iowrite8(ep0_csr, REG_UDC(EP0_CSR));
+}
+
+static void s3c2440_ep0_out_rdy(void)
+{
+
+	u8 ep0_csr = ioread8(REG_UDC(EP0_CSR));
+
+	ep0_csr |= (1 << 6);
+	iowrite8(ep0_csr, REG_UDC(EP0_CSR));
+}
+
+static void s3c2440_ep0_in_rdy(void)
+{
+	u8 ep0_csr = ioread8(REG_UDC(EP0_CSR));
+
+	ep0_csr |= (1 << 1);
+	iowrite8(ep0_csr, REG_UDC(EP0_CSR));
+
+}
+
+static void s3c2440_ep_complete_request(struct usb_ep *ep,
+			struct usb_request *req, int status)
+{
+	list_del_init(&req->list);
+	req->status = status;
+	req->complete(ep, req);
 }
 
 static void s3c2440_ep0_handle_idle(struct s3c2440_gadget *s3c2440_gadget)
@@ -112,22 +169,50 @@ static void s3c2440_ep0_handle_idle(struct s3c2440_gadget *s3c2440_gadget)
 					REG_UDC(FUNC_ADDR_REG));
 			s3c2440_ep0_out_data_end();
 			break;
+		case USB_REQ_GET_DESCRIPTOR:
+			s3c2440_gadget->ep0_rest = ctrl_req.wLength;
+			s3c2440_gadget->ep0_state = DATA_IN;
+			s3c2440_ep0_out_rdy();
+			s3c2440_gadget->driver->setup(&s3c2440_gadget->gadget,
+						&ctrl_req);
+			break;
 	}
 }
 
-static void s3c2440_ep0_handle_data_in(struct s3c2440_gadget *s3c2440_gadget)
+static void s3c2440_ep0_out_request(struct s3c2440_ep *ep,
+					struct usb_request *req)
 {
+	debug(KERN_INFO "s3c2440 udc:%s\n", __func__);
 
 }
 
-static void s3c2440_ep0_handle_data_out(struct s3c2440_gadget *s3c2440_gadget)
+static void s3c2440_ep0_in_request(struct s3c2440_ep *ep,
+					struct usb_request *req)
 {
+	int index = req->actual;
+	int len;
 
+	debug(KERN_INFO "s3c2440 udc:%s\n", __func__);
+	dump_usb_request(req);
+
+	len = req->length - req->actual;
+
+	len = len >= ep->ep.maxpacket ? ep->ep.maxpacket : len;
+
+	s3c2440_ep_write_fifo(0, &((char *)req->buf)[index], len);
+	req->actual += len;
+	if (req->actual == req->length)
+		s3c2440_ep0_in_data_end();
+	else
+		s3c2440_ep0_in_rdy();
 }
 
 static void s3c2440_ep0_handle(struct s3c2440_gadget *s3c2440_gadget)
 {
 	u8 ep0_csr = ioread8(REG_UDC(EP0_CSR));
+	struct s3c2440_ep *ep0 = &s3c2440_gadget->ep[0];
+	struct usb_request *req = list_empty(&ep0->queue) ? NULL :
+			list_entry(ep0->queue.next, struct usb_request, list);
 	
 	debug(KERN_INFO "s3c2440 udc:EP0_CSR = 0x%x\n", ep0_csr);
 
@@ -135,24 +220,35 @@ static void s3c2440_ep0_handle(struct s3c2440_gadget *s3c2440_gadget)
 		s3c2440_gadget->ep0_state = IDLE;
 		debug(KERN_INFO "s3c2440 udc:control SETUP_END\n");
 		iowrite8(1 << 7, REG_UDC(EP0_CSR));
+		//if (ep0_csr & 1)
+		//	iowrite8(1 << 6, REG_UDC(EP0_CSR));
+		//return ;
 	}
 
 	if ((ep0_csr & (1 << 1)) && !(ep0_csr & 1))
 		return;
 
+	if (req != NULL && req->actual == req->length &&
+			s3c2440_gadget->ep0_state == DATA_IN) {
+		s3c2440_ep_complete_request(&ep0->ep, req, 0);
+		s3c2440_gadget->ep0_state = IDLE;
+		debug(KERN_INFO "s3c2440 udc:ep0  data in complete\n");
+	}
+	
 	switch(s3c2440_gadget->ep0_state) {
-		case IDLE:
-			if (ep0_csr & 1)
-				s3c2440_ep0_handle_idle(s3c2440_gadget);
-			break;
-		case DATA_IN:
-			if (!(ep0_csr & (1 << 1)))
-				s3c2440_ep0_handle_data_in(s3c2440_gadget);
-			break;
-		case DATA_OUT:
-			if (ep0_csr & 1)
-				s3c2440_ep0_handle_data_out(s3c2440_gadget);
-			break;
+	case IDLE:
+		if (ep0_csr & 1)
+			s3c2440_ep0_handle_idle(s3c2440_gadget);
+		break;
+	case DATA_IN:
+		if (!(ep0_csr & (1 << 1)) && req != NULL) {
+				s3c2440_ep0_in_request(ep0, req);
+		} //那个usb_request什么时候出队，还是因为ep0的关系不出队，只把length,actual什么的改变。
+		break;
+	case DATA_OUT:
+		if (ep0_csr & 1)
+			//s3c2440_ep0_handle_data_out(s3c2440_gadget);
+		break;
 	}
 }
 
@@ -200,13 +296,17 @@ irqreturn_t s3c2440_gadget_int_handle(int irq, void *dev_id)
 
 	debug(KERN_INFO "s3c2440 udc:%s\n", __func__);
 
-	ep_int_reg = ioread8(REG_UDC(EP_INT_REG));
-	iowrite8(ep_int_reg, REG_UDC(EP_INT_REG));
-	debug(KERN_INFO "s3c2440 udc:ep_int_reg 0x%x\n", ep_int_reg);
-
 	usb_int_reg = ioread8(REG_UDC(USB_INT_REG));
 	iowrite8(usb_int_reg, REG_UDC(USB_INT_REG));
 	debug(KERN_INFO "s3c2440 udc:usb_int_reg 0x%x\n", usb_int_reg);
+	if (usb_int_reg & (1 << 2)) {
+		s3c2440_gadget->ep0_state = IDLE;
+		debug(KERN_INFO "s3c2440_udc:usb reset\n");
+	}
+
+	ep_int_reg = ioread8(REG_UDC(EP_INT_REG));
+	iowrite8(ep_int_reg, REG_UDC(EP_INT_REG));
+	debug(KERN_INFO "s3c2440 udc:ep_int_reg 0x%x\n", ep_int_reg);
 
 	if (ep_int_reg & 1)
 		s3c2440_ep0_handle(s3c2440_gadget);
@@ -273,7 +373,22 @@ static void s3c2440_ep_free_request(struct usb_ep *usb_ep,
 static int s3c2440_ep_queue(struct usb_ep *usb_ep, struct usb_request *req,
 		gfp_t gfp_flags)
 {
+	struct s3c2440_ep *ep = container_of(usb_ep, struct s3c2440_ep, ep);
+	struct s3c2440_gadget *gadget = ep->gadget;
+
 	debug(KERN_INFO "s3c2440 udc:%s\n", __func__);
+	req->actual = 0;
+	req->status = -EINPROGRESS;
+
+	if (unlikely(ep->index == 0)) {
+		if (!list_empty(&ep->queue))
+			printk(KERN_INFO "s3c2440 udc:ep0 queue is not emtpy but usb_ep_queue called \n");
+		if (gadget->ep0_state == DATA_IN)
+			s3c2440_ep0_in_request(ep, req);
+		return 0;
+	}
+	list_add_tail(&req->list, &ep->queue);
+
 	return 0;
 }
 
@@ -468,6 +583,7 @@ static void s3cc2440_gadget_init(struct s3c2440_gadget *s3c2440_gadget)
 			list_add_tail(&s3c2440_ep[i].ep.ep_list,
 					&s3c2440_gadget->gadget.ep_list);
 		INIT_LIST_HEAD(&s3c2440_ep[i].queue);
+		s3c2440_ep[i].gadget = s3c2440_gadget;
 	}
 }
 
